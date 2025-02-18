@@ -1,33 +1,41 @@
-from paperclips_ai import WebAdapter
+"""A module for the state of the game."""
+
+
 import numpy as np
+
+from paperclips_ai.adapter import WebAdapter, WebElement, EmptyWebElement
 
 class State:
     """A class representing the state of the game."""
-    def __init__(self, adapter: WebAdapter, features: list[str]):
+    def __init__(self, adapter: WebAdapter, features: set[str]):
+        """Initializes the state.
+
+        Args:
+            adapter: The adapter for the game.
+            features: The ids of all features to track.
+        """
         self.adapter = adapter
         self.size = len(features) + 1
         self.vector = np.zeros(self.size)
+        self.last_reward: int = 0
 
-        self.features = [
-            self.adapter.get_elem_by_id(feature)
-            for feature in features]
-        self.features.insert(0, None)
+        features.add('clips')
+        self.features = (
+            [EmptyWebElement('bias')]
+            + [self.adapter.get_elem_by_id(feature)
+               for feature in features]
+        )
+        self.clips_el: WebElement = [feat for feat in self.features if feat.name == 'clips'][0]
 
-        self._update()
+        self.update()
 
-    def _update(self):
+    def update(self):
         """Read data from webpage to determine current state."""
-        # get values
-        values = [1 if feature is None else feature.value for feature in self.features]
+        values = [np.log10(feature.value) if feature.value > 0 else 0
+                  for feature in self.features]
         self.vector = np.array(values)
 
     @property
-    def returns(self):
+    def returns(self) -> float:
         """The total returns of the game."""
-        return self.adapter.get_returns()
-
-    def update(self):
-        """Update the state and get the last reward."""
-        old_return = self.returns
-        self._update()
-        return self.returns - old_return
+        return self.clips_el.value
